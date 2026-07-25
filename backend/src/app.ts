@@ -1,54 +1,32 @@
-import { Scalar } from '@scalar/hono-api-reference'
 import { Hono } from 'hono'
-import { cors } from 'hono/cors'
-import { logger } from 'hono/logger'
-import { openAPIRouteHandler } from 'hono-openapi'
-import type { Container } from './di/container'
-import { AppError } from './domain/errors'
-import { createApiRouter } from './routers'
-import type { AppEnv, Bindings } from './types'
+import { createContainer, type Container } from './di/container'
+import { createUserRouter } from './routers/user-router'
+import { createTransactionRouter } from './routers/transaction-router'
 
-// Runtime-agnostic app factory. Each entrypoint (server.ts, lambda.ts)
-// supplies its own container factory so the same routes/handlers run on
-// Cloudflare Workers (D1 + KV) and AWS Lambda alike.
-export function createApp(containerFactory: (env: Partial<Bindings>) => Container) {
-  const app = new Hono<AppEnv>()
+type Env = {
+  DB: D1Database
+  KV: KVNamespace
+  ENVIRONMENT?: string
+}
 
-  app.use('*', logger())
-  app.use('*', cors())
+export function createApp() {
+  const app = new Hono<{ Bindings: Env }>()
+
+  // Inject DI container into context
   app.use('*', async (c, next) => {
-    c.set('container', containerFactory(c.env ?? {}))
+    const container = createContainer(c.env as Env)
+    c.set('container', container)
     await next()
   })
 
-  app.get('/health', (c) => c.json({ status: 'ok' }))
-  app.route('/api/v1', createApiRouter())
+  // Health check
+  app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }))
 
-  // API docs: /docs renders the Scalar UI from the generated OpenAPI spec
-  app.get(
-    '/openapi.json',
-    openAPIRouteHandler(app, {
-      documentation: {
-        info: {
-          title: 'Starter API',
-          version: '1.0.0',
-          description: 'Hono backend running on Cloudflare Workers (D1 + KV) and AWS Lambda',
-        },
-        tags: [{ name: 'Users', description: 'User management' }],
-      },
-    })
-  )
-  app.get('/docs', Scalar({ url: '/openapi.json', pageTitle: 'Starter API Docs' }))
-
-  app.notFound((c) => c.json({ error: { code: 'NOT_FOUND', message: 'Route not found' } }, 404))
-
-  app.onError((err, c) => {
-    if (err instanceof AppError) {
-      return c.json({ error: { code: err.code, message: err.message } }, err.status as 400)
-    }
-    console.error('Unhandled error:', err)
-    return c.json({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, 500)
-  })
+  // API routes
+  app.route('/api/v1/users', createUserRouter())
+  app.route('/api/v1/transactions', createTransactionRouter())
 
   return app
 }
+
+export default createApp()
