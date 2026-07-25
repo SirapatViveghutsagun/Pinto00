@@ -25,7 +25,7 @@ export const useTransactionStore = defineStore('transaction', () => {
     loading.value = true
     error.value = null
     try {
-      transactions.value = await transactionApi.fetchTransactions(userId)
+      transactions.value = await transactionApi.list(userId)
     } catch (e) {
       error.value = 'Failed to load transactions'
       console.error(e)
@@ -38,7 +38,7 @@ export const useTransactionStore = defineStore('transaction', () => {
     loading.value = true
     error.value = null
     try {
-      const created = await transactionApi.createTransaction(input)
+      const created = await transactionApi.create(input)
       transactions.value.unshift(created)
       return created
     } catch (e) {
@@ -54,7 +54,7 @@ export const useTransactionStore = defineStore('transaction', () => {
     loading.value = true
     error.value = null
     try {
-      const updated = await transactionApi.updateTransaction(id, input)
+      const updated = await transactionApi.update(id, input)
       const idx = transactions.value.findIndex((t) => t.id === id)
       if (idx !== -1) transactions.value[idx] = updated
       return updated
@@ -71,7 +71,7 @@ export const useTransactionStore = defineStore('transaction', () => {
     loading.value = true
     error.value = null
     try {
-      await transactionApi.deleteTransaction(id)
+      await transactionApi.remove(id)
       transactions.value = transactions.value.filter((t) => t.id !== id)
     } catch (e) {
       error.value = 'Failed to delete transaction'

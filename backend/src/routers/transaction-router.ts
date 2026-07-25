@@ -1,10 +1,12 @@
 import { z } from 'zod'
 import { Hono } from 'hono'
-import { describeRoute } from 'hono-openapi'
-import { validator } from 'hono-openapi/standard'
-import { jsonContent } from 'hono-openapi/helpers'
+import { describeRoute, resolver, validator } from 'hono-openapi'
 import { createTransactionSchema, idParamSchema, transactionResponseSchema, updateTransactionSchema } from '../schemas/transaction-schemas'
 import { errorResponseSchema } from '../schemas/user-schemas'
+
+const jsonContent = (schema: Parameters<typeof resolver>[0]) => ({
+  'application/json': { schema: resolver(schema) },
+})
 
 export function createTransactionRouter(): Hono {
   const router = new Hono()

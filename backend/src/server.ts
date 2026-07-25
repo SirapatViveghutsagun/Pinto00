@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { apiReference } from '@scalar/hono-api-reference'
-import { openAPISpecs } from 'hono-openapi'
+import { generateSpecs as openAPISpecs } from 'hono-openapi'
 import { createContainer } from './di/container'
 import { mountRouters } from './routers'
 
