@@ -1,17 +1,46 @@
-// Cloudflare Workers entrypoint (referenced by wrangler.jsonc "main").
-// Wires D1 + KV implementations into the runtime-agnostic app.
-import { createApp } from './app'
+import { Hono } from 'hono'
+import { apiReference } from '@scalar/hono-api-reference'
+import { openAPISpecs } from 'hono-openapi'
 import { createContainer } from './di/container'
-import { D1UserRepository } from './infrastructure/d1/d1-user-repository'
-import { KVCacheRepository } from './infrastructure/kv/kv-cache-repository'
-import type { Bindings } from './types'
+import { mountRouters } from './routers'
 
-const app = createApp((env) => {
-  const bindings = env as Bindings
-  return createContainer({
-    userRepository: new D1UserRepository(bindings.DB),
-    cacheRepository: new KVCacheRepository(bindings.KV),
+type Env = {
+  DB: D1Database
+  KV: KVNamespace
+  ENVIRONMENT?: string
+}
+
+const app = new Hono<{ Bindings: Env }>()
+
+// Health check
+app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }))
+
+// OpenAPI docs
+app.get(
+  '/openapi.json',
+  openAPISpecs(app, {
+    info: {
+      title: 'Pinto00 API',
+      version: '0.1.0',
+      description: 'Personal finance tracker API — income & expense management',
+    },
   })
+)
+
+app.get(
+  '/docs',
+  apiReference({
+    spec: { url: '/openapi.json' },
+  })
+)
+
+// Mount routes with DI container
+app.use('*', async (c, next) => {
+  const container = createContainer(c.env as Env)
+  c.set('container', container)
+  await next()
 })
+
+mountRouters(app, {} as any)
 
 export default app

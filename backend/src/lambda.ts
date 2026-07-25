@@ -1,17 +1,44 @@
-// AWS Lambda entrypoint (bundled by `npm run build:lambda`).
-// Lambda has no D1/KV bindings, so in-memory repositories are wired in here.
-// Replace with DynamoDB/RDS/ElastiCache implementations for production use.
+import { Hono } from 'hono'
 import { handle } from 'hono/aws-lambda'
-import { createApp } from './app'
+import { apiReference } from '@scalar/hono-api-reference'
+import { openAPISpecs } from 'hono-openapi'
 import { createContainer } from './di/container'
-import { MemoryCacheRepository } from './infrastructure/memory/memory-cache-repository'
-import { MemoryUserRepository } from './infrastructure/memory/memory-user-repository'
+import { mountRouters } from './routers'
 
-const container = createContainer({
-  userRepository: new MemoryUserRepository(),
-  cacheRepository: new MemoryCacheRepository(),
+type Env = {
+  DB: D1Database
+  KV: KVNamespace
+  ENVIRONMENT?: string
+}
+
+const app = new Hono<{ Bindings: Env }>()
+
+app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }))
+
+app.get(
+  '/openapi.json',
+  openAPISpecs(app, {
+    info: {
+      title: 'Pinto00 API',
+      version: '0.1.0',
+      description: 'Personal finance tracker API — income & expense management',
+    },
+  })
+)
+
+app.get(
+  '/docs',
+  apiReference({
+    spec: { url: '/openapi.json' },
+  })
+)
+
+app.use('*', async (c, next) => {
+  const container = createContainer(c.env as Env)
+  c.set('container', container)
+  await next()
 })
 
-const app = createApp(() => container)
+mountRouters(app, {} as any)
 
 export const handler = handle(app)
