@@ -10,15 +10,15 @@ const { transactions, totalIncome, totalExpense, balance, loading } = storeToRef
 
 const recentTransactions = computed(() => [...transactions.value].slice(0, 5))
 
-const incomeCategories = computed(() => {
-  const cats = transactions.value.filter(t => t.type === 'income')
+const expenseCategories = computed(() => {
+  const cats = transactions.value.filter(t => t.type === 'expense')
   const map = new Map<string, number>()
   cats.forEach(t => map.set(t.category, (map.get(t.category) || 0) + t.amount))
   return [...map.entries()].sort((a, b) => b[1] - a[1])
 })
 
-const expenseCategories = computed(() => {
-  const cats = transactions.value.filter(t => t.type === 'expense')
+const incomeCategories = computed(() => {
+  const cats = transactions.value.filter(t => t.type === 'income')
   const map = new Map<string, number>()
   cats.forEach(t => map.set(t.category, (map.get(t.category) || 0) + t.amount))
   return [...map.entries()].sort((a, b) => b[1] - a[1])
@@ -38,9 +38,16 @@ function formatDate(d: string): string {
   return date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-onMounted(() => {
-  if (userStore.user?.id) {
-    transactionStore.loadTransactions(userStore.user.id)
+// ใช้ user คนแรกเป็น default (หรือสร้าง temp ถ้ายังไม่มี)
+const currentUserId = computed(() => {
+  if (userStore.users.length > 0) return userStore.users[0].id
+  return null
+})
+
+onMounted(async () => {
+  await userStore.fetchUsers()
+  if (currentUserId.value) {
+    transactionStore.loadTransactions(currentUserId.value)
   }
 })
 </script>
@@ -85,9 +92,9 @@ onMounted(() => {
       <VCard>
         <VCardTitle class="d-flex align-center justify-space-between pa-4">
           <span class="text-h6">รายการล่าสุด</span>
-          <VBtn variant="text" size="small" to="/transaction-page">
-            ดูทั้งหมด
-          </VBtn>
+          <RouterLink to="/transaction-page">
+            <VBtn variant="text" size="small">ดูทั้งหมด</VBtn>
+          </RouterLink>
         </VCardTitle>
         <VDivider />
         <div v-if="loading" class="text-center pa-8">
@@ -117,9 +124,9 @@ onMounted(() => {
         <div v-else class="text-center pa-8 text-medium-emphasis">
           <VIcon icon="ri-inbox-line" size="48" class="mb-2" />
           <p>ยังไม่มีรายการ</p>
-          <VBtn variant="outlined" size="small" class="mt-2" to="/transaction-page">
-            เพิ่มรายการแรก
-          </VBtn>
+          <RouterLink to="/transaction-page">
+            <VBtn variant="outlined" size="small" class="mt-2">เพิ่มรายการแรก</VBtn>
+          </RouterLink>
         </div>
       </VCard>
     </VCol>
@@ -132,20 +139,24 @@ onMounted(() => {
         </VCardTitle>
         <VDivider />
         <VCardText>
-          <div v-if="expenseCategories.length === 0" class="text-center pa-4 text-medium-emphasis">
-            ยังไม่มีข้อมูลรายจ่าย
+          <div v-if="expenseCategories.length === 0 && incomeCategories.length === 0" class="text-center pa-4 text-medium-emphasis">
+            ยังไม่มีข้อมูล
           </div>
-          <div v-for="[cat, amount] in expenseCategories" :key="cat" class="d-flex align-center mb-3">
-            <span class="flex-1">{{ categoryLabel(cat) }}</span>
-            <span class="text-error ms-2">-{{ formatBaht(amount) }}</span>
-          </div>
-          <VDivider class="my-2" />
-          <div v-if="incomeCategories.length > 0">
+          <template v-if="expenseCategories.length > 0">
+            <div class="text-subtitle-2 text-error mb-2">รายจ่าย</div>
+            <div v-for="[cat, amount] in expenseCategories" :key="cat" class="d-flex align-center mb-3">
+              <span class="flex-1">{{ categoryLabel(cat) }}</span>
+              <span class="text-error ms-2">-{{ formatBaht(amount) }}</span>
+            </div>
+            <VDivider class="my-2" />
+          </template>
+          <template v-if="incomeCategories.length > 0">
+            <div class="text-subtitle-2 text-success mb-2">รายรับ</div>
             <div v-for="[cat, amount] in incomeCategories" :key="cat" class="d-flex align-center mb-3">
               <span class="flex-1">{{ categoryLabel(cat) }}</span>
               <span class="text-success ms-2">+{{ formatBaht(amount) }}</span>
             </div>
-          </div>
+          </template>
         </VCardText>
       </VCard>
     </VCol>
@@ -154,12 +165,12 @@ onMounted(() => {
     <VCol cols="12">
       <VCard>
         <VCardText class="d-flex justify-center ga-4 pa-4">
-          <VBtn color="success" prepend-icon="ri-add-line" to="/transaction-page">
-            เพิ่มรายรับ
-          </VBtn>
-          <VBtn color="error" prepend-icon="ri-subtract-line" to="/transaction-page">
-            เพิ่มรายจ่าย
-          </VBtn>
+          <RouterLink to="/transaction-page">
+            <VBtn color="success" prepend-icon="ri-add-line">เพิ่มรายรับ</VBtn>
+          </RouterLink>
+          <RouterLink to="/transaction-page">
+            <VBtn color="error" prepend-icon="ri-subtract-line">เพิ่มรายจ่าย</VBtn>
+          </RouterLink>
         </VCardText>
       </VCard>
     </VCol>
